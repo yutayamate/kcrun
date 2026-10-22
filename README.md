@@ -113,9 +113,9 @@ The resulting `kcrun` executable is created in the current directory.
 
 ## Automated builds and tests
 
-GitHub Actions builds and tests the project on macOS for branch pushes, pull requests, and manual runs. Tagged releases build and test native Intel (`x86_64`) and Apple Silicon (`arm64`) binaries. Each GitHub Release includes both binaries, an SPDX JSON SBOM for each, and `SHA256SUMS`.
+GitHub Actions builds and tests the project on macOS for branch pushes, pull requests, and manual runs. Tagged releases build and test native Intel (`x86_64`) and Apple Silicon (`arm64`) binaries. Each GitHub Release includes both binaries, an SPDX JSON SBOM and a Sigstore bundle for each, and `SHA256SUMS`.
 
-To download the latest release and verify the checksums and provenance for your Mac's architecture, install the GitHub CLI and run:
+To download the latest release and verify its checksums, cosign signature, and GitHub provenance for your Mac's architecture, install the GitHub CLI and cosign, then run:
 
 ```sh
 mkdir -p "$HOME/Downloads/kcrun"
@@ -126,10 +126,14 @@ gh release download --repo yutayamate/kcrun \
 cd "$HOME/Downloads/kcrun"
 shasum -a 256 -c SHA256SUMS
 binary="kcrun-macos-$(uname -m)"
+cosign verify-blob "$binary" \
+  --bundle "$binary.sigstore.json" \
+  --certificate-identity-regexp '^https://github.com/yutayamate/kcrun/.github/workflows/release.yml@refs/tags/v.*$' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 gh attestation verify "$binary" --repo yutayamate/kcrun
 ```
 
-`gh release download` without a tag selects the latest release. The attestation check verifies that GitHub linked the binary to this repository's release build. The binaries are not Apple Developer ID signed or notarized.
+`gh release download` without a tag selects the latest release. Cosign verifies the binary's integrity and that it was signed by this repository's tagged release workflow. The GitHub attestation check verifies that GitHub linked the binary to this repository's release build. Cosign signatures do not replace Apple Developer ID code signing or notarization; the binaries are not Apple Developer ID signed or notarized.
 
 Run the integration tests locally on macOS after building:
 
