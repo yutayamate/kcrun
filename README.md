@@ -38,7 +38,7 @@ For Bash, add this to `~/.bashrc`:
 command -v kcrun > /dev/null 2>&1 && source <(kcrun completions bash)
 ```
 
-Open a new shell or reload the relevant configuration file. Completion suggests kcrun options and command names after `--`; it does not query Keychain items. The equivalent static completion files are also available in `completions/`.
+Open a new shell or reload the relevant configuration file. Completion suggests kcrun options and command names after `--`; it does not query Keychain items.
 
 ## Secure an MCP server configuration
 
