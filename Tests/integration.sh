@@ -23,8 +23,8 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-security add-generic-password -U -a "$account" -s "$service" -w "$secret"
-security add-generic-password -U -a "$account" -s "$second_service" -w "$second_secret"
+security add-generic-password -U -a "$account" -s "$service" -w "$secret" -T "$binary"
+security add-generic-password -U -a "$account" -s "$second_service" -w "$second_secret" -T "$binary"
 
 # The child confirms injection without printing the secret.
 "$binary" \
