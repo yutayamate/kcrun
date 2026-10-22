@@ -22,7 +22,25 @@ kcrun \
   -- my-tool --option value
 ```
 
-`NAME` must be a valid environment-variable name. Existing environment variables are inherited, and values loaded from Keychain override matching names. The command and its arguments follow `--`.
+`NAME` must be a valid environment-variable name. Existing environment variables are inherited, and values loaded from Keychain override matching names. The command and its arguments follow `--`. Run `kcrun --help` for a concise usage summary.
+
+## Shell completion
+
+Completion scripts are included for zsh and Bash. For zsh, copy the completion file into a directory on `fpath`:
+
+```sh
+mkdir -p ~/.zfunc
+cp completions/_kcrun ~/.zfunc/_kcrun
+```
+
+Add `fpath=(~/.zfunc $fpath)` to `~/.zshrc` before its existing `compinit` call, then start a new shell. For Bash, copy and source the completion script from your interactive shell setup:
+
+```sh
+mkdir -p ~/.bash_completion.d
+cp completions/kcrun.bash ~/.bash_completion.d/kcrun
+```
+
+Add `source ~/.bash_completion.d/kcrun` to `~/.bash_profile` or the file your Bash session loads. Completion suggests kcrun options and command names after `--`; it does not query Keychain items.
 
 ## Secure an MCP server configuration
 
@@ -95,15 +113,23 @@ The resulting `kcrun` executable is created in the current directory.
 
 ## Automated builds and tests
 
-GitHub Actions builds and tests the project on macOS for branch pushes, pull requests, and manual runs. Tagged releases build and test native Intel (`x86_64`) and Apple Silicon (`arm64`) binaries. Each GitHub Release includes `kcrun-macos-x86_64` (Intel), `kcrun-macos-arm64` (Apple Silicon), an SPDX JSON SBOM for each binary, and `SHA256SUMS`. After downloading the files into one directory, verify them with `shasum -a 256 -c SHA256SUMS`.
+GitHub Actions builds and tests the project on macOS for branch pushes, pull requests, and manual runs. Tagged releases build and test native Intel (`x86_64`) and Apple Silicon (`arm64`) binaries. Each GitHub Release includes both binaries, an SPDX JSON SBOM for each, and `SHA256SUMS`.
 
-GitHub artifact attestations provide signed build provenance and SBOM attestations for each release binary. Verify a downloaded binary with the GitHub CLI:
+To download the latest release and verify the checksums and provenance for your Mac's architecture, install the GitHub CLI and run:
 
 ```sh
-gh attestation verify kcrun-macos-arm64 --repo yutayamate/kcrun
+mkdir -p "$HOME/Downloads/kcrun"
+gh release download --repo yutayamate/kcrun \
+  --pattern 'kcrun-macos-*' \
+  --pattern SHA256SUMS \
+  --dir "$HOME/Downloads/kcrun"
+cd "$HOME/Downloads/kcrun"
+shasum -a 256 -c SHA256SUMS
+binary="kcrun-macos-$(uname -m)"
+gh attestation verify "$binary" --repo yutayamate/kcrun
 ```
 
-The binaries are not Apple Developer ID signed or notarized.
+`gh release download` without a tag selects the latest release. The attestation check verifies that GitHub linked the binary to this repository's release build. The binaries are not Apple Developer ID signed or notarized.
 
 Run the integration tests locally on macOS after building:
 

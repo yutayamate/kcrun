@@ -34,6 +34,32 @@ EOF
 }
 trap cleanup EXIT HUP INT TERM
 
+echo "test: checking help output"
+"$binary" --help >"$stdout_file" 2>"$stderr_file"
+grep -q '^Usage:' "$stdout_file"
+grep -q -- '--env NAME=SERVICE' "$stdout_file"
+test ! -s "$stderr_file"
+"$binary" -h >"$stdout_file" 2>"$stderr_file"
+grep -q '^Usage:' "$stdout_file"
+test ! -s "$stderr_file"
+
+echo "test: checking argument errors"
+set +e
+"$binary" --env >"$stdout_file" 2>"$stderr_file"
+argument_status=$?
+set -e
+test "$argument_status" -eq 2
+test ! -s "$stdout_file"
+grep -q -- "--env requires a NAME=SERVICE mapping" "$stderr_file"
+grep -q "kcrun --help" "$stderr_file"
+
+set +e
+"$binary" --env BAD-NAME=service -- /usr/bin/true >"$stdout_file" 2>"$stderr_file"
+argument_status=$?
+set -e
+test "$argument_status" -eq 2
+grep -q "invalid environment-variable name" "$stderr_file"
+
 echo "test: creating temporary Keychain"
 security create-keychain -p "$keychain_password" "$keychain_path"
 security unlock-keychain -p "$keychain_password" "$keychain_path"
@@ -61,17 +87,21 @@ echo "test: checking multiple environment mappings"
 test "$(cat "$stdout_file")" = "injection-ok"
 test ! -s "$stderr_file"
 
-# A failed lookup must not start the requested command.
+# A failed lookup must not start the requested command, even if an earlier
+# mapping resolved successfully.
 echo "test: checking missing-item failure"
 missing_service="$service-missing"
-if "$binary" --env KCRUN_TEST_SECRET="$missing_service" -- /usr/bin/touch "$marker" \
+if "$binary" \
+  --env KCRUN_TEST_SECRET="$service" \
+  --env KCRUN_TEST_SECRET_TWO="$missing_service" \
+  -- /usr/bin/touch "$marker" \
   >"$stdout_file" 2>"$stderr_file"; then
   echo "test: missing Keychain item unexpectedly succeeded" >&2
   exit 1
 fi
 test ! -e "$marker"
 test ! -s "$stdout_file"
-grep -q "no Keychain item found" "$stderr_file"
+grep -q "no generic password found for Keychain service" "$stderr_file"
 
 # The command's exit status must pass through kcrun.
 echo "test: checking child exit status"
@@ -81,5 +111,16 @@ set +e
 child_status=$?
 set -e
 test "$child_status" -eq 23
+
+echo "test: checking command-not-found guidance"
+set +e
+"$binary" --env KCRUN_TEST_SECRET="$service" -- kcrun-command-that-does-not-exist \
+  >"$stdout_file" 2>"$stderr_file"
+child_status=$?
+set -e
+test "$child_status" -eq 127
+test ! -s "$stdout_file"
+grep -q "was not found" "$stderr_file"
+grep -q "PATH" "$stderr_file"
 
 echo "kcrun integration tests passed"

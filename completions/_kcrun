@@ -1,0 +1,15 @@
+#compdef kcrun
+
+_kcrun() {
+  if (( ${words[(I)--]} )); then
+    _normal
+    return
+  fi
+
+  _arguments -s \
+    '(-h --help)'{-h,--help}'[Show help]' \
+    '--env[Set an environment variable from a Keychain service]:NAME=SERVICE:' \
+    '--[Start the command and its arguments]'
+}
+
+_kcrun "$@"

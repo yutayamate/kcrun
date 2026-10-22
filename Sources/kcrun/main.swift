@@ -8,9 +8,57 @@ struct EnvironmentMapping {
 }
 
 func fail(_ message: String, status: Int32 = 2) -> Never {
-    let line = "kcrun: \(message)\n"
-    FileHandle.standardError.write(Data(line.utf8))
+    FileHandle.standardError.write(Data("kcrun: \(message)\n".utf8))
     exit(status)
+}
+
+func usageError(_ message: String) -> Never {
+    fail("\(message)\nRun 'kcrun --help' for usage.")
+}
+
+func showHelp() -> Never {
+    let help = """
+    Usage:
+      kcrun --env NAME=SERVICE [--env NAME=SERVICE ...] -- COMMAND [ARGS...]
+      kcrun --help
+
+    Read generic passwords from the macOS Keychain, set them as environment
+    variables, and replace kcrun with the requested command.
+
+    Options:
+      --env NAME=SERVICE  Set NAME to the Keychain generic password for SERVICE.
+                          Repeat to provide multiple variables.
+      -h, --help          Show this help.
+
+    Examples:
+      kcrun --env API_KEY=my-api-key -- my-tool --option value
+      kcrun --env API_KEY=service-one --env TOKEN=service-two -- my-tool
+
+    Store a secret without putting its value in shell history:
+      security add-generic-password -a "$USER" -s my-api-key -w
+
+    The command starts only after every requested Keychain item has been read.
+    Secret values are not printed by kcrun.
+    """
+    FileHandle.standardOutput.write(Data((help + "\n").utf8))
+    exit(0)
+}
+
+func keychainHint(for status: OSStatus) -> String {
+    switch status {
+    case errSecInteractionNotAllowed:
+        return "The Keychain may be locked or macOS may need permission to let kcrun read this item. Unlock the Keychain in Keychain Access and approve access if prompted."
+    case errSecAuthFailed:
+        return "Keychain access was denied. Check the item's access controls in Keychain Access and allow kcrun to read it."
+    case errSecUserCanceled:
+        return "Keychain access was cancelled. Retry and approve the access request if prompted."
+    case errSecNoSuchKeychain:
+        return "The item may be in a Keychain that is not in the user's Keychain search list. Check its location in Keychain Access."
+    case errSecNotAvailable:
+        return "Keychain services are unavailable. Confirm this is a macOS session with Keychain access."
+    default:
+        return "Check that the Keychain is available and that kcrun is allowed to read the item."
+    }
 }
 
 func readSecret(service: String) -> String {
@@ -24,16 +72,17 @@ func readSecret(service: String) -> String {
     let status = SecItemCopyMatching(query as CFDictionary, &result)
     guard status == errSecSuccess else {
         if status == errSecItemNotFound {
-            fail("no Keychain item found for service '\(service)'")
+            fail("no generic password found for Keychain service '\(service)'. Add the item in Keychain Access or with 'security add-generic-password'.")
         }
-        fail("Keychain lookup failed for service '\(service)' (status \(status))")
+        let systemMessage = (SecCopyErrorMessageString(status, nil) as String?) ?? "OSStatus \(status)"
+        fail("could not read Keychain service '\(service)': \(systemMessage). \(keychainHint(for: status))")
     }
 
     guard let data = result as? Data else {
-        fail("could not read Keychain value for service '\(service)'")
+        fail("Keychain returned no password data for service '\(service)'. Check that it is a generic password item.")
     }
     guard let secret = String(data: data, encoding: .utf8) else {
-        fail("Keychain value for service '\(service)' is not valid UTF-8")
+        fail("Keychain value for service '\(service)' is not valid UTF-8. Store the secret as UTF-8 text.")
     }
     return secret
 }
@@ -49,40 +98,48 @@ while index < arguments.count {
         index += 1
         break
     }
+    if argument == "--help" || argument == "-h" {
+        showHelp()
+    }
     guard argument == "--env" else {
-        fail("unexpected argument '\(argument)'; use --env NAME=SERVICE and -- COMMAND [ARGS...]")
+        usageError("unexpected option or argument '\(argument)'")
     }
     index += 1
-    guard index < arguments.count else { fail("--env requires NAME=SERVICE") }
+    guard index < arguments.count, arguments[index] != "--" else {
+        usageError("--env requires a NAME=SERVICE mapping")
+    }
     let pair = arguments[index]
     guard let separator = pair.firstIndex(of: "=") else {
-        fail("invalid mapping '\(pair)'; expected NAME=SERVICE")
+        usageError("invalid mapping '\(pair)'; expected NAME=SERVICE")
     }
     let name = String(pair[..<separator])
     let service = String(pair[pair.index(after: separator)...])
     guard !name.isEmpty, name.range(of: #"^[A-Za-z_][A-Za-z0-9_]*$"#, options: .regularExpression) != nil else {
-        fail("invalid environment variable name '\(name)'")
+        usageError("invalid environment-variable name '\(name)'")
     }
-    guard !service.isEmpty else { fail("service name must not be empty") }
+    guard !service.isEmpty else {
+        usageError("Keychain service name for '\(name)' must not be empty")
+    }
     guard environmentNames.insert(name).inserted else {
-        fail("environment variable '\(name)' was specified more than once")
+        usageError("environment variable '\(name)' was specified more than once")
     }
     mappings.append(EnvironmentMapping(name: name, service: service))
     index += 1
 }
 
 guard index < arguments.count else {
-    fail("a command is required after --")
+    usageError("no command provided after '--'")
 }
 guard !mappings.isEmpty else {
-    fail("at least one --env NAME=SERVICE mapping is required")
+    usageError("at least one --env NAME=SERVICE mapping is required")
 }
 
 // Resolve every item before changing the environment or starting the child.
 let resolved = mappings.map { ($0.name, readSecret(service: $0.service)) }
 for (name, value) in resolved {
     guard setenv(name, value, 1) == 0 else {
-        fail("could not set environment variable '\(name)' (errno \(errno))")
+        let reason = String(cString: strerror(errno))
+        fail("could not set environment variable '\(name)': \(reason) (errno \(errno))")
     }
 }
 
@@ -97,4 +154,13 @@ _ = executable.withCString { path in
         execvp(path, buffer.baseAddress!)
     }
 }
-fail("could not execute '\(executable)' (errno \(errno))", status: 127)
+
+let executionError = errno
+let reason = String(cString: strerror(executionError))
+if executionError == ENOENT {
+    fail("command '\(executable)' was not found. Check its path or make sure it is available in PATH.", status: 127)
+}
+if executionError == EACCES {
+    fail("permission denied when starting '\(executable)'. Check the path and executable permissions.", status: 126)
+}
+fail("could not start '\(executable)': \(reason) (errno \(executionError))", status: 126)
