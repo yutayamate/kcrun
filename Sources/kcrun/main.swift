@@ -20,7 +20,7 @@ func showHelp() -> Never {
     let help = """
     Usage:
       kcrun --env NAME=SERVICE [--env NAME=SERVICE ...] -- COMMAND [ARGS...]
-      kcrun completions zsh|bash
+      kcrun completion zsh|bash
       kcrun --help
 
     Read generic passwords from the macOS Keychain, set them as environment
@@ -30,7 +30,7 @@ func showHelp() -> Never {
       --env NAME=SERVICE  Set NAME to the Keychain generic password for SERVICE.
                           Repeat to provide multiple variables.
       -h, --help          Show this help.
-      completions SHELL  Print shell completion code for zsh or Bash.
+      completion SHELL   Print shell completion code for zsh or Bash.
 
     Examples:
       kcrun --env API_KEY=my-api-key -- my-tool --option value
@@ -91,7 +91,7 @@ func showCompletions(for shell: String) -> Never {
             return 0
           fi
 
-          COMPREPLY=( $(compgen -W "--env --help -h -- completions" -- "$cur") )
+          COMPREPLY=( $(compgen -W "--env --help -h -- completion" -- "$cur") )
         }
 
         complete -o bashdefault -o default -F _kcrun_complete kcrun
@@ -147,9 +147,9 @@ func readSecret(service: String) -> String {
 }
 
 let arguments = Array(CommandLine.arguments.dropFirst())
-if arguments.first == "completions" {
+if arguments.first == "completion" {
     guard arguments.count == 2 else {
-        usageError("'completions' requires one shell name: zsh or bash")
+        usageError("'completion' requires one shell name: zsh or bash")
     }
     showCompletions(for: arguments[1])
 }

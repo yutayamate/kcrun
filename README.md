@@ -29,13 +29,13 @@ kcrun \
 `kcrun` can print completion code directly, so the shell can load it without you copying or opening a completion file. Add this to `~/.zshrc`:
 
 ```sh
-command -v kcrun > /dev/null 2>&1 && source <(kcrun completions zsh)
+command -v kcrun > /dev/null 2>&1 && source <(kcrun completion zsh)
 ```
 
 For Bash, add this to `~/.bashrc`:
 
 ```sh
-command -v kcrun > /dev/null 2>&1 && source <(kcrun completions bash)
+command -v kcrun > /dev/null 2>&1 && source <(kcrun completion bash)
 ```
 
 Open a new shell or reload the relevant configuration file. Completion suggests kcrun options and command names after `--`; it does not query Keychain items.

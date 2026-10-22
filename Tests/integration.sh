@@ -40,17 +40,17 @@ grep -q '^Usage:' "$stdout_file"
 grep -q -- '--env NAME=SERVICE' "$stdout_file"
 test ! -s "$stderr_file"
 
-echo "test: checking generated shell completions"
-"$binary" completions zsh >"$stdout_file" 2>"$stderr_file"
+echo "test: checking generated shell completion"
+"$binary" completion zsh >"$stdout_file" 2>"$stderr_file"
 grep -q 'compdef _kcrun kcrun' "$stdout_file"
 test ! -s "$stderr_file"
 zsh -n "$stdout_file"
-"$binary" completions bash >"$stdout_file" 2>"$stderr_file"
+"$binary" completion bash >"$stdout_file" 2>"$stderr_file"
 grep -q 'complete -o bashdefault -o default -F _kcrun_complete kcrun' "$stdout_file"
 test ! -s "$stderr_file"
 bash -n "$stdout_file"
 set +e
-"$binary" completions fish >"$stdout_file" 2>"$stderr_file"
+"$binary" completion fish >"$stdout_file" 2>"$stderr_file"
 completion_status=$?
 set -e
 test "$completion_status" -eq 2
