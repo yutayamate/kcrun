@@ -2,6 +2,8 @@
 
 `kcrun` reads secrets from the macOS Keychain, sets them as environment variables, and starts a command with those variables available. It is a small Swift command-line tool with no third-party dependencies.
 
+[![Build and test](https://github.com/yutayamate/kcrun/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/yutayamate/kcrun/actions/workflows/build.yml) [![Latest release](https://img.shields.io/github/v/release/yutayamate/kcrun)](https://github.com/yutayamate/kcrun/releases/latest) [![License](https://img.shields.io/github/license/yutayamate/kcrun)](LICENSE)
+
 ## Use kcrun
 
 Save each secret as a generic password in Keychain. The service name identifies the item when you run `kcrun`:
