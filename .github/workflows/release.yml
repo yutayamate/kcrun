@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: macos-15-intel
+          - arch: arm64
+            runner: macos-15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p dist
+          test "$(uname -m)" = "$ARCH"
+          swiftc -O -framework Security Sources/kcrun/main.swift -o "dist/kcrun-macos-$ARCH"
+          file "dist/kcrun-macos-$ARCH"
+
+      - name: Test
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: sh Tests/integration.sh "dist/kcrun-macos-$ARCH"
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          file: ./dist/kcrun-macos-${{ matrix.arch }}
+          format: spdx-json
+          output-file: ./dist/kcrun-macos-${{ matrix.arch }}.spdx.json
+          artifact-name: kcrun-macos-${{ matrix.arch }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      # GitHub artifact attestations require public visibility or GitHub Enterprise Cloud.
+      - name: Attest build provenance
+        if: ${{ github.event.repository.visibility == 'public' }}
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: dist/kcrun-macos-${{ matrix.arch }}
+
+      - name: Attest SBOM
+        if: ${{ github.event.repository.visibility == 'public' }}
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: dist/kcrun-macos-${{ matrix.arch }}
+          sbom-path: dist/kcrun-macos-${{ matrix.arch }}.spdx.json
+
+      - name: Upload release files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: kcrun-${{ matrix.arch }}
+          path: dist/kcrun-macos-${{ matrix.arch }}*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download release files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: kcrun-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create checksums
+        run: cd dist && shasum -a 256 kcrun-macos-* > SHA256SUMS
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/kcrun-macos-* dist/SHA256SUMS --title "kcrun $TAG" --generate-notes

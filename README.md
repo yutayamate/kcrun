@@ -95,7 +95,15 @@ The resulting `kcrun` executable is created in the current directory.
 
 ## Automated builds and tests
 
-GitHub Actions builds and tests the project on macOS for pushes, pull requests, and manual runs. A successful run uploads the executable and its SHA-256 checksum as a workflow artifact. Open the run in the repository's **Actions** tab and download its artifact. Artifacts are named with the runner architecture and commit, and are retained for 30 days. The current artifacts are not signed or notarized.
+GitHub Actions builds and tests the project on macOS for branch pushes, pull requests, and manual runs. Tagged releases build and test native Intel (`x86_64`) and Apple Silicon (`arm64`) binaries. Each GitHub Release includes `kcrun-macos-x86_64` (Intel), `kcrun-macos-arm64` (Apple Silicon), an SPDX JSON SBOM for each binary, and `SHA256SUMS`. After downloading the files into one directory, verify them with `shasum -a 256 -c SHA256SUMS`.
+
+GitHub artifact attestations provide signed build provenance and SBOM attestations for each release binary. Verify a downloaded binary with the GitHub CLI:
+
+```sh
+gh attestation verify kcrun-macos-arm64 --repo yutayamate/kcrun
+```
+
+The binaries are not Apple Developer ID signed or notarized.
 
 Run the integration tests locally on macOS after building:
 
