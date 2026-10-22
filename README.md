@@ -26,21 +26,19 @@ kcrun \
 
 ## Shell completion
 
-Completion scripts are included for zsh and Bash. For zsh, copy the completion file into a directory on `fpath`:
+`kcrun` can print completion code directly, so the shell can load it without you copying or opening a completion file. Add this to `~/.zshrc`:
 
 ```sh
-mkdir -p ~/.zfunc
-cp completions/_kcrun ~/.zfunc/_kcrun
+command -v kcrun > /dev/null 2>&1 && source <(kcrun completions zsh)
 ```
 
-Add `fpath=(~/.zfunc $fpath)` to `~/.zshrc` before its existing `compinit` call, then start a new shell. For Bash, copy and source the completion script from your interactive shell setup:
+For Bash, add this to `~/.bashrc`:
 
 ```sh
-mkdir -p ~/.bash_completion.d
-cp completions/kcrun.bash ~/.bash_completion.d/kcrun
+command -v kcrun > /dev/null 2>&1 && source <(kcrun completions bash)
 ```
 
-Add `source ~/.bash_completion.d/kcrun` to `~/.bash_profile` or the file your Bash session loads. Completion suggests kcrun options and command names after `--`; it does not query Keychain items.
+Open a new shell or reload the relevant configuration file. Completion suggests kcrun options and command names after `--`; it does not query Keychain items. The equivalent static completion files are also available in `completions/`.
 
 ## Secure an MCP server configuration
 

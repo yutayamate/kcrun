@@ -11,5 +11,3 @@ _kcrun() {
     '--env[Set an environment variable from a Keychain service]:NAME=SERVICE:' \
     '--[Start the command and its arguments]'
 }
-
-_kcrun "$@"

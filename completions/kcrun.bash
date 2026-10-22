@@ -22,7 +22,7 @@ _kcrun_complete() {
     return 0
   fi
 
-  COMPREPLY=( $(compgen -W "--env --help -h --" -- "$cur") )
+  COMPREPLY=( $(compgen -W "--env --help -h -- completions" -- "$cur") )
 }
 
 complete -o bashdefault -o default -F _kcrun_complete kcrun
